@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
+/*
 NOTES:
 - anything pointed to by udc_mem[*].*.ADDR.reg *MUST* BE IN RAM and be 32-bit aligned... no exceptions
 */
@@ -44,10 +44,13 @@ NOTES:
 #include "usb_descriptors.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define USE_DBL_TAP /* comment out to use GPIO input for bootloader entry */
+#define USE_MUL_TAP /* comment out to use GPIO input for bootloader entry */
+#define ALLOW_APP_TRIGGER_BL /* comment out to disallow application enter BL */
 #define REBOOT_AFTER_DOWNLOAD /* comment out to prevent boot into app after it has been downloaded */
 #define USB_CMD(dir, rcpt, type) ((USB_##dir##_TRANSFER << 7) | (USB_##type##_REQUEST << 5) | (USB_##rcpt##_RECIPIENT << 0))
 #define SIMPLE_USB_CMD(rcpt, type) ((USB_##type##_REQUEST << 5) | (USB_##rcpt##_RECIPIENT << 0))
+
+#define APP_TRIGGER_BL_MAGIC 0xd7582bbdaab6da5bULL
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -59,7 +62,7 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static uint32_t usb_config = 0;
 static uint32_t dfu_status_choices[4] =
-{ 
+{
   0x00000000, 0x00000002, /* normal */
   0x00000000, 0x00000005, /* dl */
 };
@@ -231,14 +234,15 @@ static void __attribute__((noinline)) USB_Service(void)
   }
 }
 
-#ifdef USE_DBL_TAP
-  #define DBL_TAP_MAGIC 0xf02669ef
-  static volatile uint32_t __attribute__((section(".bootloader_magic"))) double_tap;
+#ifdef USE_MUL_TAP
+  #define MUL_TAP_MAGIC 0xf02669ef7fc2f1dcULL
+  static volatile uint64_t __attribute__((section(".bootloader_magic"))) multi_tap;
+  static volatile uint32_t tap_count;
 #endif
 
 void bootloader(void)
 {
-#ifndef USE_DBL_TAP
+#ifndef USE_MUL_TAP
   /* configure PA15 (bootloader entry pin used by SAM-BA) as input pull-up */
   PORT->Group[0].PINCFG[15].reg = PORT_PINCFG_PULLEN | PORT_PINCFG_INEN;
   PORT->Group[0].OUTSET.reg = (1UL << 15);
@@ -257,36 +261,45 @@ void bootloader(void)
   if (DSU->DATA.reg)
     goto run_bootloader; /* CRC failed, so run bootloader */
 
-#ifndef USE_DBL_TAP
+#ifdef ALLOW_APP_TRIGGER_BL
+  if (APP_TRIGGER_BL_MAGIC==multi_tap)
+    goto run_bootloader;
+#endif
+
+#ifndef USE_MUL_TAP
   if (!(PORT->Group[0].IN.reg & (1UL << 15)))
     goto run_bootloader; /* pin grounded, so run bootloader */
 
   return; /* we've checked everything and there is no reason to run the bootloader */
 #else
   if (PM->RCAUSE.reg & PM_RCAUSE_POR)
-    double_tap = 0; /* a power up event should never be considered a 'double tap' */
-  
-  if (double_tap == DBL_TAP_MAGIC)
+    multi_tap = 0; /* a power up event should never be considered a 'double tap' */
+
+  if (multi_tap == MUL_TAP_MAGIC)
   {
     /* a 'double tap' has happened, so run bootloader */
-    double_tap = 0;
-    goto run_bootloader;
+    tap_count++;
+  }else{
+    tap_count = 0;
   }
 
   /* postpone boot for a short period of time; if a second reset happens during this window, the "magic" value will remain */
-  double_tap = DBL_TAP_MAGIC;
+  multi_tap = MUL_TAP_MAGIC;
   volatile int wait = 65536; while (wait--);
   /* however, if execution reaches this point, the window of opportunity has closed and the "magic" disappears  */
-  double_tap = 0;
+  if (tap_count == 1)
+    goto run_bootloader;
+  multi_tap = 0;
   return;
 #endif
 
 run_bootloader:
+  multi_tap = 0;
 #if 1
   /*
   configure oscillator for crystal-free USB operation (USBCRM / USB Clock Recovery Mode)
   */
-  
+
   SYSCTRL->OSC8M.bit.PRESC = 0;
 
   SYSCTRL->INTFLAG.reg = SYSCTRL_INTFLAG_BOD33RDY | SYSCTRL_INTFLAG_BOD33DET | SYSCTRL_INTFLAG_DFLLRDY;

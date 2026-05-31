@@ -52,8 +52,8 @@ Pre-compiled images are already available via this project's Releases tab.
 
 |bootloader variant                 |Clang 11.1.0 (-O1) |Clang 13.0.0 (-O1) |GNU Arm 2019-q4 (-Os)   |
 |-----------------------------------|-------------------|-------------------|------------------------|
-| USE_DBL_TAP+REBOOT_AFTER_DOWNLOAD | 999 bytes         | 999 bytes         | 1024 bytes (just fits!)|
-| USE_DBL_TAP                       | 983 bytes         | 983 bytes         | 1012 bytes             |
+| USE_MUL_TAP+REBOOT_AFTER_DOWNLOAD | 999 bytes         | 999 bytes         | 1024 bytes (just fits!)|
+| USE_MUL_TAP                       | 983 bytes         | 983 bytes         | 1012 bytes             |
 | GPIO input+REBOOT_AFTER_DOWNLOAD  | 979 bytes         | 979 bytes         | 996 bytes              |
 | GPIO input                        | 963 bytes         | 963 bytes         | 984 bytes              |
 
