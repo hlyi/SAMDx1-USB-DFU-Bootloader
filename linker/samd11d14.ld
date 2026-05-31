@@ -69,7 +69,7 @@ SECTIONS
 
   .dont_move_block (NOLOAD): ALIGN(4)
   {
-    *(.vectors_ram)
+    *(.bootloader_magic)
   }
 
   .data : ALIGN(4)

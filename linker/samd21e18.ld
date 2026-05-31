@@ -64,7 +64,7 @@ SECTIONS
 
   .dont_move_block (NOLOAD): ALIGN(4)
   {
-    *(.vectors_ram)
+    *(.bootloader_magic)
   } > ram
 
   .uninit_RESERVED : ALIGN(4)
