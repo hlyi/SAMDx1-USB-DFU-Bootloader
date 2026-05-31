@@ -1,14 +1,15 @@
 ##############################################################################
 BUILD = build
-BIN = D11boot
 
 ##############################################################################
 .PHONY: all directory clean size
 
 #DEVDEF =-D__SAMD11D14AM__
 #DEVLINK = samd11d14
+#BIN = D11boot
 DEVDEF =-D__SAMD21E18A__
 DEVLINK = samd21e18
+BIN = D21boot
 
 CC = arm-none-eabi-gcc
 OBJCOPY = arm-none-eabi-objcopy
