@@ -49,6 +49,8 @@ NOTES:
 #define REBOOT_AFTER_DOWNLOAD /* comment out to prevent boot into app after it has been downloaded */
 #define USB_CMD(dir, rcpt, type) ((USB_##dir##_TRANSFER << 7) | (USB_##type##_REQUEST << 5) | (USB_##rcpt##_RECIPIENT << 0))
 #define SIMPLE_USB_CMD(rcpt, type) ((USB_##type##_REQUEST << 5) | (USB_##rcpt##_RECIPIENT << 0))
+#define LED_PIN PORT_PA28
+#define LED_PORT 0
 
 #define APP_TRIGGER_BL_MAGIC 0xd7582bbdaab6da5bULL
 
@@ -383,6 +385,29 @@ run_bootloader:
   service USB
   */
 
-  while (1)
+#ifdef LED_PIN
+  SysTick->CTRL = 0;
+  SysTick->LOAD = 479999UL; // for 10ms tick
+  SysTick->VAL = 0;
+  SysTick->CTRL = (1UL << SysTick_CTRL_ENABLE_Pos) | (1UL << SysTick_CTRL_CLKSOURCE_Pos);
+  PORT->Group[LED_PORT].DIRSET.reg = LED_PIN;
+  PORT->Group[LED_PORT].OUTCLR.reg = LED_PIN;	// turn on LED assuming active low
+#endif
+
+  while (1){
     USB_Service();
+#ifdef LED_PIN
+    if (SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) {
+	static uint32_t tick_cnt ;
+	tick_cnt++;
+	if ( tick_cnt >= 50){
+	   tick_cnt = 0;
+	}
+	if ( tick_cnt == 0 ){
+		PORT->Group[LED_PORT].OUTTGL.reg = LED_PIN;
+	}
+    }
+#endif
+  }
 }
+
