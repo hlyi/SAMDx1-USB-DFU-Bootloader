@@ -1,5 +1,5 @@
 /*
- * 1kByte USB DFU bootloader for Atmel SAMD11 microcontrollers
+ * 2kByte USB DFU bootloader for Atmel SAMD11 microcontrollers
  *
  * Copyright (c) 2018-2020, Peter Lawrence
  * derived from https://github.com/ataradov/vcp Copyright (c) 2016, Alex Taradov <alex@taradov.com>
@@ -42,6 +42,7 @@ NOTES:
 #include "usb.h"
 #include "nvm_data.h"
 #include "usb_descriptors.h"
+#include "dfu.h"
 
 /*- Definitions -------------------------------------------------------------*/
 #define USE_MUL_TAP /* comment out to use GPIO input for bootloader entry */
@@ -236,11 +237,14 @@ static void __attribute__((noinline)) USB_Service(void)
   }
 }
 
+
 #ifdef USE_MUL_TAP
   #define MUL_TAP_MAGIC 0xf02669ef7fc2f1dcULL
   static volatile uint64_t __attribute__((section(".bootloader_magic"))) multi_tap;
   static volatile uint32_t tap_count;
 #endif
+
+enum dfu_state usbdfu_state = STATE_DFU_IDLE;
 
 void bootloader(void)
 {
@@ -399,12 +403,25 @@ run_bootloader:
 #ifdef LED_PIN
     if (SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) {
 	static uint32_t tick_cnt ;
+        uint32_t    status_limit;
 	tick_cnt++;
-	if ( tick_cnt >= 50){
-	   tick_cnt = 0;
-	}
+        switch ( usbdfu_state ) {
+        case STATE_DFU_IDLE:
+        case STATE_APP_IDLE:
+        case STATE_APP_DETACH:
+            status_limit = 50;
+            break;
+        case STATE_DFU_ERROR:
+            status_limit = 10 ;
+            break;
+        default:
+            status_limit = 20;
+            break;
+        }
+
+        if ( tick_cnt >= status_limit ) tick_cnt = 0;
 	if ( tick_cnt == 0 ){
-		PORT->Group[LED_PORT].OUTTGL.reg = LED_PIN;
+            PORT->Group[LED_PORT].OUTTGL.reg = LED_PIN;
 	}
     }
 #endif
